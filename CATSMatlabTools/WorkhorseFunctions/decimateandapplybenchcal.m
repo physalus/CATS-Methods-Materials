@@ -48,8 +48,13 @@ numrows = nout; %size(Depth,1);
 %     Mt = filterCATS([data.Comp1 data.Comp2 data.Comp3],ceil(ofs/8),round(ofs),.05);
 %     Mt = filterMag(Mt,ofs,tagon);
 % else
-Mt = [data.Comp1 data.Comp2 data.Comp3];
-% could try below lines to get rid of data spikes, but may get hung up.
+try
+    Mt = [data.Comp1 data.Comp2 data.Comp3];
+catch
+    Mt = nan(size(Depth,1),3);
+    warning ('No magnetometer detected, Mt is nans');
+end
+    % could try below lines to get rid of data spikes, but may get hung up.
 % try
 %     Mt = filterCATS([data.Comp1 data.Comp2 data.Comp3],ceil(ofs/8),round(ofs),.05); 
 % catch; Mt = nan(size(Depth,1),3);
