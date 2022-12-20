@@ -96,13 +96,13 @@ disp('Section 1 completed');
 % files from each audio file (created as part of step 1). 
 
 % variables to set
-decfac = 5; %decimation factor (e.g. decimate 50 Hz data in "data" to 10 Hz data with a decfac of 5)
+decfac = 2; %decimation factor (e.g. decimate 50 Hz data in "data" to 10 Hz data with a decfac of 5)
 % Can set "folder" below to start looking for files in a specific place on your computer
-folder = 'e:/CATS/tag_data_raw/'; % folder in the drive where the cal files are located (and where you want to look for files) %'Users//Dave//Documents//Programs//MATLAB//Tagging//CATS cal';%
+folder = 'D:\Tag Data\Dtags\3s\ONR Energetics of Exposure\ONR proposal\DATA\Beaked Whales\tag_data_raw/'; % folder in the drive where the cal files are located (and where you want to look for files) %'Users//Dave//Documents//Programs//MATLAB//Tagging//CATS cal';%
 
 % import files
 global fileloc filename
-cf = pwd; try cd([vol '://' folder]); catch; end
+cf = pwd; try cd(folder); catch; end
 [filename,fileloc]=uigetfile('*.mat', 'select CATS data (imported mat file)'); 
 cd(fileloc);
 if ispc
@@ -157,7 +157,7 @@ end
 % can set to a specific start time in matlab datenumber format.  
 % Leave as nan to use the graphical interface, or 
 % set to 0 if you do not want to truncate the start time at all.
-truncstart = nan;
+truncstart = 0;
 
 % Follow the prompts at the top of the plot, will need to press enter twice
 % to accept the default selection, or follow prompts to choose the location
@@ -253,8 +253,8 @@ tagon = gettagon(data.Pressure,ofs,data.Date(1)+data.Time(1)+timedif/24,[data.Ac
 %video and the data). This may or may not be the future default until the
 %processor speeds of CATS tags are sufficient to handle video/data time
 %synchs independently.
-synchusingvidtimestamps = false; % for newer videos where timestamp from data is imprinted on video
-nocam = false; %false; % set to true if this is a data only tag. If there is just audio, keep at true.  Will have to set audon independently
+synchusingvidtimestamps = true; % for newer videos where timestamp from data is imprinted on video accurately (CHECK THIS BEFORE SWITCHING THIS FLAG TO TRUE, RECOMMEND USING HEADER FILE TO IDENTIFY SURFACINGS FOR MORE ACCURATE SYNCHRONIZATIONS)
+nocam = false; %false; % set to true if this is a data only tag. If there is just audio, set to true.  Will have to set audon independently
 audioonly = false; % set to true if tag has no camera but does have audio
 
 if CellNum<4; x = input('Previous cell has not been completed, continue anyway? 1 = yes, 2 = no');
@@ -280,17 +280,25 @@ if nocam
             warning('If this is not a cats tag press enter to try to read the start time of each audio file from the file name of files within the AudioData folder');
             warning('If there is an error, create a movieTimes file with a "vidDN" and "vidDurs" variable that matches the start time and duration of each audio file');
             pause;
-         wavFilestoMovieTimes
+            disp('Make a movieTimes file by reading timestamps from file names (e.g. for acousonde)? For dtag or continuous wav files with no gaps, press no')
+            xx = input('1 = yes, 2 = no? ');
+            if xx == 1
+            wavFilestoMovieTimes
+            else
+                vidDN = [];
+                audon = true(size(tagon));
+                audstart = ODN;
+            end
         end
          
          for i = 1:length(vidDN)
              if ~isnan(vidDN(i))
                  [~,a] = min(abs(DNorig-vidDN(i))); 
-                 [~,b] = min(abs(DNorig-(vidDN(i)+vidDurs(i)/24/60/60)))
+                 [~,b] = min(abs(DNorig-(vidDN(i)+vidDurs(i)/24/60/60)));
                  audon(a:b)= true;
              end
          end
-         audstart = vidDN(find(~isnan(vidDN),1)); % audstart is only necessary for tags that have a single audio file (like 4k tags where audio is recorded on diary)
+         if ~isempty(vidDN); audstart = vidDN(find(~isnan(vidDN),1)); end% audstart is only necessary for tags that have a single audio file (like 4k tags where audio is recorded on diary)
 %          audstart = nan; 
     else; audstart = nan;
     end
@@ -499,6 +507,7 @@ allowpitchflip = false; % set to true if the direction of your gimbal rotation c
 end
 if ~exist('data','var'); load([fileloc filename(1:end-4) 'truncate.mat']); end
  if ~exist('Depth','var') || ~exist('At','var') || ~exist('Mt','var') || ~exist('Gt','var')
+      load([fileloc filename(1:end-4) 'Info.mat'],'DN','CAL','camondec','ofs','df','fs','tagondec','nopress');
     [Depth,At,Mt,Gt] = applyCal2(data,DN,CAL,camondec,ofs,Hzs,df);
 end
  try  load([fileloc filename(1:end-4) 'Info.mat'],'W','calperiodI'); catch; end
@@ -547,7 +556,7 @@ disp('Section 8b done');
 
 vars = load([fileloc filename(1:end-4) 'Info.mat'],'vidDN','audstart','vidDurs','vidNum','fs','ofs','camondec','tagondec','nocam','nopress','df','CAL','Hzs','DN','whaleName');
 if isempty(vars.vidDN) 
-    try load([fileloc filename(1:end-4) 'movieTimes.mat']); vars.vidDN = vidDN; vars.vidDurs = vidDurs; save([fileloc filename(1:end-4) 'Info.mat'],'vidDN','vidDurs','-append'); %vars.vidNam = v2.vidNum;
+    try load([fileloc filename(1:end-4) 'movieTimes.mat']); vars.vidDN = vidDN; vars.vidDurs = vidDurs; save([fileloc filename(1:end-4) 'Info.mat'],'vidDN','vidDurs','vidNam','-append'); %vars.vidNam = v2.vidNum;
     catch; warning('vidDN variable is empty (no timestamps from video files), will try assuming audio files start at start of data files'); 
     end
 end
@@ -580,7 +589,7 @@ if s == 1
     try if isempty(audstart); stitchaudio([fileloc 'AudioData//'],vars.whaleName,vars.DN(1),vars.vidDN,fileloc); end; catch; disp('error in stitch audio'); end
    catch disp('error in read audio- continue without making flownoise? 1 = yes, 2= no');
        ss = input('?');
-       if ss == 2; error('error in read audio'); else flownoise = nan(size(Depth)); AUD = []; end
+       if ss == 2; error('error in read audio, run get flownoise line above to find source of error'); else flownoise = nan(size(Depth)); AUD = []; end
    end
 end
 
@@ -716,6 +725,7 @@ minPitch = 20;
 % speedEnds = speedper(:,2);
 minSpeed = .4;
 % speedEnds([1 4 5 end-1:end]) = [];
+% speedper = [1 430000; 430000 speedper(end)];
 
 if sum(isnan(flownoise)) == length(flownoise)
     RMS2 = []; lab = '';% could set RMS2 = Jig(:,4); lab = 'magJ'; if you want to compare the multiaxes model jig to the overall magnitude model
@@ -798,7 +808,7 @@ try save([fileloc filename(1:end-4) 'Info.mat'],'Paddles','-append'); catch; end
 % Machine Learning Toolbox, Mapping Toolbox
 
 creator = 'DEC';
-notes = 'Speed calibration is not great.';
+notes = '';
 
 load([fileloc filename(1:end-4) 'Info.mat']);%,'nocam','speedstats','Temp','Light','JigRMS','CAL','fs','timedif','DN','flownoise','camondec','ofs','Hzs','df','dec','W','slips','tagondec','audondec');
 if CellNum<11; x = input('Previous cell has not been completed, continue anyway? 1 = yes, 2 = no');
@@ -823,11 +833,13 @@ CAL.info = 'Bench cals used for G, 3d in situ cal used for M, A and p. If A3d is
 tagon = tagondec; camon = camondec; tagslip = slips; 
 %
 if ~exist('frameTimes','var') && ~nocam; load([fileloc filename(1:end-4) 'movieTimes.mat'],'frameTimes'); end
-if ~exist('vidNam','var')&& ~nocam; load([fileloc filename(1:end-4) 'movieTimes.mat'],'frameTimes','vidNam','vid4k'); end
+if ~exist('vidNam','var')&& ~nocam || sum(~isnan(vidDN))>0; load([fileloc filename(1:end-4) 'movieTimes.mat'],'frameTimes','vidNam','vid4k'); end
 if exist('frameTimes','var') && length(frameTimes)>length(vidDN); frameTimes(length(vidDN)+1:end) = []; end
 
-if ~nocam; viddeploy = find(vidDN<DN(find(tagon,1,'last')) & vidDN+vidDurs/24/60/60>DN(find(tagon,1))&~cellfun(@isempty,frameTimes)); end
-if nocam; flownoise = nan(size(p)); vidDN = []; vidNam = []; vidDurs = []; viddeploy = [];  if ~exist('speed','var'); speed = table(nan(size(p)),nan(size(p)),nan(size(p)),'VariableNames',{'JJ' 'FN','SP'}); end; end
+if ~nocam; viddeploy = find(vidDN<DN(find(tagon,1,'last')) & vidDN+vidDurs/24/60/60>DN(find(tagon,1))&~cellfun(@isempty,frameTimes));
+elseif sum(audondec) ~= 0 && sum(~isnan(vidDN))>0; viddeploy = find(vidDN<DN(find(tagon,1,'last')) & vidDN+vidDurs/24/60/60>DN(find(tagon,1)));
+end
+if nocam && sum(audondec) == 0; flownoise = nan(size(p)); vidDN = []; vidNam = []; vidDurs = []; viddeploy = [];  if ~exist('speed','var'); speed = table(nan(size(p)),nan(size(p)),nan(size(p)),'VariableNames',{'JJ' 'FN','SP'}); end; end
 audon = audondec; 
 
 INFO = struct;
@@ -893,6 +905,19 @@ save([fileloc prhfile],'Aw','At','Gw','Gt','fs','pitch','roll','head','p','T','L
 if exist('Paddles','var'); save([fileloc prhfile],'Paddles','-append'); end
 save([fileloc filename(1:end-4) 'Info.mat'],'prhfile','CellNum','INFO','-append');
 disp('Section 12 finished, prh file and INFO saved');
+
+% % if you got a warning about speed being too big (only for very large
+% % files), can split speed up before trying the -v7.3 switch
+%  speed2 = speed(:,[1 3:7 9:end]);
+% speed = speed(:,[2 8]);
+% save([fileloc prhfile],'speed','-append')
+% for i = 1:2:size(speed2,2)
+%     var = speed2(:,i:min(i+1,size(speed2,2)));
+%     eval(['speeddetails' num2str((i+1)/2) ' = var;'])
+%     save([fileloc prhfile],['speeddetails' num2str((i+1)/2)],'-append');
+%     copyfile([fileloc prhfile],[fileloc prhfile(1:end-4) num2str((i+1)/2) '.mat']) % in case there is an error, can use this line to ensure the most recent version still exists
+% end
+
 %% 13a. Adds tag GPS data to data structure. 
 % User: first construct a pos file from ubx file using Ublox conversion or similar, or put GPS data from fastloc GPS in a "fastgps" folder then run this code 
 % if you have GPS data from another source, can skip this section in favor
@@ -1019,7 +1044,7 @@ savefig(102,[fileloc 'QL//' INFO.whaleName 'geotrack.fig']);
 %
 prh2Acq(fileloc,prhfile);
 
-rootDIR = fileloc(1:strfind(fileloc,'CATS')+4);
+rootDIR = fileloc(1:strfind(fileloc,'tag_data_raw')-1);
 try
 copyfile([fileloc INFO.whaleName ' ' num2str(fs) 'Hzprh.mat'],[rootDIR 'tag_data//prh//' INFO.whaleName ' ' num2str(fs) 'Hzprh.mat']);
 catch; disp('could not copy file to tag_data/prh directory');
