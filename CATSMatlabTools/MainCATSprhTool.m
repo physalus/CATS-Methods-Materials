@@ -783,7 +783,7 @@ end
 
 
 CellNum = 11;
-
+if ~exist('speedstats','var'); speedstats = struct(); end
 disp('Section 11 (speed) finished');
 save([fileloc filename(1:end-4) 'Info.mat'],'CellNum','JigRMS','speedstats','-append');
 try save([fileloc filename(1:end-4) 'Info.mat'],'Paddles','-append'); catch; end
@@ -827,7 +827,7 @@ if ~exist('head','var')
     [pitch,roll,head] = calcprh(Aw,Mw,dec);
 end
 if ~exist('speed','var')
-    speed = applySpeed(JigRMS,'JJ',flownoise,'FN',tagondec,p,pitch,roll,fs,speedstats);
+    try speed = applySpeed(JigRMS,'JJ',flownoise,'FN',tagondec,p,pitch,roll,fs,speedstats); catch; warning('Speed could not be calculated'); end
 end
 CAL.info = 'Bench cals used for G, 3d in situ cal used for M, A and p. If A3d is empty, bench cal was used. If temp was used in Mag cal, there will be a "temp" variable in the structure; use appycalT to apply that structure to mag and temp data.  Axes must be corrected to NED before applying 3d cals, but not before applying original style bench cals since they take that into account';
 tagon = tagondec; camon = camondec; tagslip = slips; 
@@ -998,7 +998,7 @@ disp(['dominant stroke frequency: ' num2str(fpk) ' quality: ' num2str(q)]);
 [bodypitch,bodyroll] = a2pr([AA(:,1:2) -AA(:,3)],fs,fpk/2); bodyroll = -bodyroll; %uses method from animaltags.org (allows for filtering) and then rotates back to normal axis orientation.
 bodyhead = wrapToPi(m2h([Mw(:,1:2) -Mw(:,3)],[AA(:,1:2) -AA(:,3)],fs,fpk/2)+dec);
 
-sp = speed.JJ;
+sp = speed.JJ; if sum(isnan(sp)) == length(sp); disp('Speed is nans, using 1 m/s baseline throughout for track'); sp = ones(size(p))*.6; end
 % can use regular pitch or head if bodypitch or bodyhead have errors.
 % Bodypitch and bodyhead are just smoothed versions of pitch and head
 % uncomment this part if you may have sleeping whales (or slow moving
@@ -1056,15 +1056,18 @@ head(isnan(head)) = 0; pitch(isnan(pitch)) = 0; roll(isnan(roll)) = 0; Ptrack(1:
 % these try/catches are just about putting the files in a trackplot folder
 % if it exists, since trackplot files need to be in the folder with the
 % trackplot program to be run.
+
+if fs >= 10; tpfilt = 1.25; else tpfilt = 1; end
+
 try
     % first option makes just the DMA file, second option uses the pseudotrack,
     % third option uses the geocorrected pseudotrack.
     % CATS2TrackPlot_DMA(fileloc,[whaleName ' ' num2str(fs) 'Hzprh.mat']);
-    CATS2TrackPlot(head,pitch,roll,tagon,DN,fs,Ptrack,false,INFO.whaleName,1.25,[rootDIR 'tag_data//TrackPlot//']);
-    CATS2TrackPlot(newhead,pitch,roll,tagon,DN,fs,geoPtrack,true,[INFO.whaleName 'geo'],1.25,[rootDIR 'tag_data//TrackPlot//']);
+    CATS2TrackPlot(head,pitch,roll,tagon,DN,fs,Ptrack,false,INFO.whaleName,tpfilt,[rootDIR 'tag_data//TrackPlot//']);
+    CATS2TrackPlot(newhead,pitch,roll,tagon,DN,fs,geoPtrack,true,[INFO.whaleName 'geo'],tpfilt,[rootDIR 'tag_data//TrackPlot//']);
 catch
-    CATS2TrackPlot(head,pitch,roll,tagon,DN,fs,Ptrack,false,INFO.whaleName,1.25,fileloc);
-    CATS2TrackPlot(newhead,pitch,roll,tagon,DN,fs,geoPtrack,true,[INFO.whaleName 'geo'],1.25,fileloc);
+    CATS2TrackPlot(head,pitch,roll,tagon,DN,fs,Ptrack,false,INFO.whaleName,tpfilt,fileloc);
+    CATS2TrackPlot(newhead,pitch,roll,tagon,DN,fs,geoPtrack,true,[INFO.whaleName 'geo'],tpfilt,fileloc);
 end
 
 % netcdf format needs meta data so that it is portable to other
