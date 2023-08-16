@@ -96,7 +96,7 @@ disp('Section 1 completed');
 % files from each audio file (created as part of step 1). 
 
 % variables to set
-decfac = 2; %decimation factor (e.g. decimate 50 Hz data in "data" to 10 Hz data with a decfac of 5)
+decfac = 5; %decimation factor (e.g. decimate 50 Hz data in "data" to 10 Hz data with a decfac of 5)
 % Can set "folder" below to start looking for files in a specific place on your computer
 folder = 'D:\Tag Data\Dtags\3s\ONR Energetics of Exposure\ONR proposal\DATA\Beaked Whales\tag_data_raw/'; % folder in the drive where the cal files are located (and where you want to look for files) %'Users//Dave//Documents//Programs//MATLAB//Tagging//CATS cal';%
 
@@ -720,10 +720,10 @@ end
 
 
 % set threshold parameters
-minDepth = 2;
-minPitch = 20;
+minDepth = 5;
+minPitch = 45;
 % speedEnds = speedper(:,2);
-minSpeed = .4;
+minSpeed = 1;
 % speedEnds([1 4 5 end-1:end]) = [];
 % speedper = [1 430000; 430000 speedper(end)];
 
@@ -808,7 +808,7 @@ try save([fileloc filename(1:end-4) 'Info.mat'],'Paddles','-append'); catch; end
 % Machine Learning Toolbox, Mapping Toolbox
 
 creator = 'DEC';
-notes = '';
+notes = 'Mag axis orientation set by trial and error. Appears to need correction of -1 for all axes. Acc needed -1 for y axis (per tag orientation picture).';
 
 load([fileloc filename(1:end-4) 'Info.mat']);%,'nocam','speedstats','Temp','Light','JigRMS','CAL','fs','timedif','DN','flownoise','camondec','ofs','Hzs','df','dec','W','slips','tagondec','audondec');
 if CellNum<11; x = input('Previous cell has not been completed, continue anyway? 1 = yes, 2 = no');
@@ -816,16 +816,18 @@ if CellNum<11; x = input('Previous cell has not been completed, continue anyway?
 end
 
 if ~exist('data','var'); load([fileloc filename(1:end-4) 'truncate.mat']); end
-% if ~exist('At','var');
+if ~exist('At','var')||~exist('p','var')||~exist('Mt','var');
     [p,At,Mt,Gt,T,TempI,Light] = applyCal2(data,DN,CAL,camondec,ofs,Hzs,df);
-%     Mt = fir_nodelay(Mt,128,2/(ofs/2),'low');
-% end
+    Mt = fir_nodelay(Mt,128,2/(fs/2),'low');
+end
 
 
 if ~exist('head','var')
     [Aw,Mw,Gw] = applyW(W,slips(1:end-1,2),slips(2:end,1),At,Mt,Gt);
     [pitch,roll,head] = calcprh(Aw,Mw,dec);
 end
+
+
 if ~exist('speed','var')
     try speed = applySpeed(JigRMS,'JJ',flownoise,'FN',tagondec,p,pitch,roll,fs,speedstats); catch; warning('Speed could not be calculated'); end
 end
@@ -833,7 +835,9 @@ CAL.info = 'Bench cals used for G, 3d in situ cal used for M, A and p. If A3d is
 tagon = tagondec; camon = camondec; tagslip = slips; 
 %
 if ~exist('frameTimes','var') && ~nocam; load([fileloc filename(1:end-4) 'movieTimes.mat'],'frameTimes'); end
-if ~exist('vidNam','var')&& ~nocam || sum(~isnan(vidDN))>0; load([fileloc filename(1:end-4) 'movieTimes.mat'],'frameTimes','vidNam','vid4k'); end
+if ~exist('vidNam','var')&& ~nocam || sum(~isnan(vidDN))>0; load([fileloc filename(1:end-4) 'movieTimes.mat'],'frameTimes','vidNam','vid4k'); 
+elseif ~exist('vidNam','var'); vidNam = {}; viddeploy = [];
+end
 if exist('frameTimes','var') && length(frameTimes)>length(vidDN); frameTimes(length(vidDN)+1:end) = []; end
 
 if ~nocam; viddeploy = find(vidDN<DN(find(tagon,1,'last')) & vidDN+vidDurs/24/60/60>DN(find(tagon,1))&~cellfun(@isempty,frameTimes));
@@ -1044,7 +1048,7 @@ savefig(102,[fileloc 'QL//' INFO.whaleName 'geotrack.fig']);
 %
 prh2Acq(fileloc,prhfile);
 
-rootDIR = fileloc(1:strfind(fileloc,'tag_data_raw')-1);
+rootDIR = fileloc(1:strfind(fileloc,'tag_data')-1);
 try
 copyfile([fileloc INFO.whaleName ' ' num2str(fs) 'Hzprh.mat'],[rootDIR 'tag_data//prh//' INFO.whaleName ' ' num2str(fs) 'Hzprh.mat']);
 catch; disp('could not copy file to tag_data/prh directory');
